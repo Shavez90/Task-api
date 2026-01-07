@@ -1,7 +1,6 @@
 package org.mini.taskapp.task;
 
 import lombok.RequiredArgsConstructor;
-import org.mini.taskapp.exception.ForbiddenException;
 import org.mini.taskapp.exception.TaskNotFoundException;
 import org.mini.taskapp.exception.UserNotFoundException;
 import org.mini.taskapp.model.User;
@@ -65,19 +64,13 @@ public class TaskService {
      * @param request The update request containing new title and content
      * @param userId The ID of the authenticated user from JWT
      * @return TaskResponseDTO with the updated task details
-     * @throws TaskNotFoundException if task doesn't exist
-     * @throws ForbiddenException if user doesn't own the task
+     * @throws TaskNotFoundException if task doesn't exist or user doesn't own it
      */
     public TaskResponseDTO updateTask(String taskId, UpdateTaskRequest request, String userId) {
-        // Find task by ID
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
-
-        // ✅ CRITICAL SECURITY CHECK: Verify ownership before allowing update
-        // This prevents users from modifying other users' tasks
-        if (!task.getUserId().equals(userId)) {
-            throw new ForbiddenException("You don't have permission to update this task");
-        }
+        // Find task by ID and userId - atomic ownership check
+        // ✅ CRITICAL SECURITY CHECK: This query ensures task exists AND belongs to user
+        Task task = taskRepository.findByIdAndUserId(taskId, userId)
+                .orElseThrow(() -> new TaskNotFoundException("Task not found or you don't have permission to update it"));
 
         // Update task fields
         task.setTitle(request.getTitle());
@@ -91,22 +84,16 @@ public class TaskService {
      * Delete a task owned by the authenticated user.
      * @param taskId The ID of the task to delete
      * @param userId The ID of the authenticated user from JWT
-     * @throws TaskNotFoundException if task doesn't exist
-     * @throws ForbiddenException if user doesn't own the task
+     * @throws TaskNotFoundException if task doesn't exist or user doesn't own it
      */
     public void deleteTask(String taskId, String userId) {
-        // Find task by ID
-        Task task = taskRepository.findById(taskId)
-                .orElseThrow(() -> new TaskNotFoundException("Task not found with id: " + taskId));
+        // Verify task exists and belongs to user before deletion
+        // ✅ CRITICAL SECURITY CHECK: Ensures task exists AND belongs to user
+        Task task = taskRepository.findByIdAndUserId(taskId, userId)
+                .orElseThrow(() -> new TaskNotFoundException("Task not found or you don't have permission to delete it"));
 
-        // ✅ CRITICAL SECURITY CHECK: Verify ownership before allowing deletion
-        // This prevents users from deleting other users' tasks
-        if (!task.getUserId().equals(userId)) {
-            throw new ForbiddenException("You don't have permission to delete this task");
-        }
-
-        // Delete the task
-        taskRepository.deleteById(taskId);
+        // Delete the task - using the efficient method
+        taskRepository.deleteByIdAndUserId(taskId, userId);
     }
 
     /**
