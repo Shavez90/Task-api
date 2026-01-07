@@ -89,8 +89,9 @@ public class TaskService {
     public void deleteTask(String taskId, String userId) {
         // Verify task exists and belongs to user before deletion
         // ✅ CRITICAL SECURITY CHECK: Ensures task exists AND belongs to user
-        Task task = taskRepository.findByIdAndUserId(taskId, userId)
-                .orElseThrow(() -> new TaskNotFoundException("Task not found or you don't have permission to delete it"));
+        if (!taskRepository.findByIdAndUserId(taskId, userId).isPresent()) {
+            throw new TaskNotFoundException("Task not found or you don't have permission to delete it");
+        }
 
         // Delete the task - using the efficient method
         taskRepository.deleteByIdAndUserId(taskId, userId);

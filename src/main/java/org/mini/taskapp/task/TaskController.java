@@ -81,7 +81,7 @@ public class TaskController {
      * @param taskId The ID of the task to update
      * @param request UpdateTaskRequest containing new title and content
      * @return TaskResponseDTO with updated task details
-     * @throws ForbiddenException if user doesn't own the task (handled in service)
+     * @throws TaskNotFoundException if task doesn't exist or user doesn't own it (handled in service)
      */
     @PutMapping("/{taskId}")
     public ResponseEntity<TaskResponseDTO> updateTask(
@@ -100,7 +100,7 @@ public class TaskController {
      * The service layer verifies ownership before allowing the deletion.
      * @param taskId The ID of the task to delete
      * @return 204 No Content on successful deletion
-     * @throws ForbiddenException if user doesn't own the task (handled in service)
+     * @throws TaskNotFoundException if task doesn't exist or user doesn't own it (handled in service)
      */
     @DeleteMapping("/{taskId}")
     public ResponseEntity<Void> deleteTask(@PathVariable String taskId) {
