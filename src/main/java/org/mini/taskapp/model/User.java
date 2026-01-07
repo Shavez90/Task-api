@@ -21,7 +21,6 @@ public class User {
     private List<String> taskIds;
 
     private Instant createdAt;
-    private Role role;
     public  String  email;
 
 }
