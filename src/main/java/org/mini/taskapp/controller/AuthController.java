@@ -3,6 +3,8 @@ package org.mini.taskapp.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.mini.taskapp.dto.LoginRequest;
+import org.mini.taskapp.dto.LoginResponse;
 import org.mini.taskapp.security.JwtService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -13,7 +15,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/app/login")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
