@@ -702,4 +702,376 @@ spring.data.mongodb.uri=${MONGODB_URI:mongodb+srv://user:pass@cluster.mongodb.ne
 ═══════════════════════════════════════════════════════════════════════════════
                             END OF REFERENCE GUIDE
 ═══════════════════════════════════════════════════════════════════════════════
+ ╔══════════════════════════════════════════════════════════════════════════════╗
+ ║         BUILDING A SECURE BACKEND FROM SCRATCH → FIRST ENDPOINT              ║
+ ╚══════════════════════════════════════════════════════════════════════════════╝
+
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │ PHASE 1: PROJECT SETUP & DATABASE                                           │
+ └─────────────────────────────────────────────────────────────────────────────┘
+
+   1. Create Spring Boot Project
+      ├─ Dependencies:  Web, Data MongoDB, Security, JWT
+      └─ Folder Structure:
+          ├─ model/       (User, Task, Role entities)
+          ├─ dto/         (Request/Response objects)
+          ├─ repository/  (Database queries)
+          ├─ service/     (Business logic)
+          ├─ controller/  (REST endpoints)
+          ├─ security/    (JWT, filters, config)
+          ├─ config/      (App configuration)
+          └─ exception/   (Error handling)
+
+   2. Setup MongoDB
+      └─ application.properties:
+          spring.data.mongodb.uri=...
+          jwt.secret=your-secret-key
+          jwt.expiration=3600000
+
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │ PHASE 2: DATA MODELS (No auth yet, just structure)                          │
+ └─────────────────────────────────────────────────────────────────────────────┘
+
+   3. Create User Model
+      ┌──────────────────────┐
+      │      User            │
+      ├──────────────────────┤
+      │ - id (String)        │
+      │ - username (String)  │
+      │ - password (String)  │  ← Will be hashed!
+      │ - email (String)     │
+      │ - createdAt          │
+      │ - updatedAt          │
+      └──────────────────────┘
+
+   4. Create UserRepository (MongoDB queries)
+      └─ Methods:
+         ├─ findByUsername(username)
+         ├─ existsByUsername(username)
+         └─ existsByEmail(email)
+
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │ PHASE 3: PASSWORD SECURITY (Hash, don't store plain text!)                  │
+ └─────────────────────────────────────────────────────────────────────────────┘
+
+   5. Create PasswordConfig
+      └─ Bean:  PasswordEncoder (BCryptPasswordEncoder)
+
+         Input:  "password123"
+         Output: "$2a$10$salt... hashedpassword" ← Different every time!
+
+   6. Create UserService (Basic CRUD)
+      └─ Methods:
+         ├─ createUser(request)
+         │  ├─ Check if username exists
+         │  ├─ Validate email
+         │  ├─ Hash password with BCrypt
+         │  └─ Save to MongoDB
+         │
+         └─ getUserByUsername(username)
+            └─ Fetch from database
+
+ ┌────────────────────────────────���────────────────────────────────────────────┐
+ │ PHASE 4: JWT AUTHENTICATION (Stateless, token-based)                        │
+ └─────────────────────────────────────────────────────────────────────────────┘
+
+   7. Create JwtService
+      └─ Handles JWT tokens:
+
+         ┌─────────────────────────────────────┐
+         │   generateToken(UserDetails)        │
+         │                                     │
+         │   HEADER:    {typ: "JWT", ... }       │
+         │   PAYLOAD:  {username, roles, ...}  │
+         │   SIGNATURE:  HMAC-SHA256(secret)    │
+         │                                     │
+         │   OUTPUT:  "eyJhbGc..." (3 parts)    │
+         └─────────────────────────────────────┘
+
+         Methods:
+         ├─ generateToken(userDetails) → "eyJ..."
+         ├─ extractUsername(token) → username
+         ├─ extractClaim(token, claims) → specific data
+         ├─ isTokenValid(token, userDetails) → true/false
+         └─ isTokenExpired(token) → true/false
+
+   8. Create JwtAuthenticationFilter (Runs on EVERY request)
+
+         Request Flow:
+         ├─ Extract "Authorization:  Bearer eyJ..." header
+         ├─ Extract token (remove "Bearer ")
+         ├─ Validate token signature
+         ├─ Check if expired
+         ├─ Extract username from token
+         ├─ Load UserDetails from database
+         ├─ Create Authentication object
+         ├─ Put in SecurityContext (Spring knows user is authenticated!)
+         └─ Continue to controller
+
+         If invalid?  → Skip, let SecurityConfig handle it
+
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │ PHASE 5: SPRING SECURITY CONFIGURATION                                      │
+ └─────────────────────────────────────────────────────────────────────────────┘
+
+   9. Create SecurityConfig
+
+         ┌──────────────────────────────────────────────┐
+         │         HTTP Security Chain                  │
+         ├───────────────────────────────────��──────────┤
+         │                                              │
+         │  1.  Disable CSRF (for REST APIs)             │
+         │  2. Enable CORS                              │
+         │  3. Set SessionCreationPolicy. STATELESS       │
+         │     └─ No sessions!  Just tokens              │
+         │                                              │
+         │  4. Authorization Rules:                      │
+         │     ├─ /api/auth/** → permitAll()            │
+         │     ├─ /api/users/** → permitAll()           │
+         │     └─ /** → authenticated()                 │
+         │                                              │
+         │  5. Register JwtAuthenticationFilter         │
+         │     └─ Runs BEFORE UsernamePasswordFilter    │
+         │                                              │
+         │  6. Create AuthenticationManager bean        │
+         │     └─ Used in AuthController for login      │
+         │                                              │
+         └──────────────────────────────────────────────┘
+
+ ┌────────────────────────────────��────────────────────────────────────────────┐
+ │ PHASE 6: DTOs (Data Transfer Objects - API Contracts)                       │
+ └─────────────────────────────────────────────────────────────────────────────┘
+
+   10. Create DTOs (What API receives/returns)
+
+       ┌──────────────────────┐
+       │  LoginRequest        │
+       ├──────────────────────┤
+       │ - username           │
+       │ - password           │
+       └──────────────────────┘
+
+       ┌──────────────────────┐
+       │  LoginResponse       │
+       ├──────────────────────┤
+       │ - token (JWT)        │
+       │ - type:  "Bearer"     │
+       │ - expiresIn: 3600    │
+       └──────────────────────┘
+
+       ┌──────────────────────┐
+       │  CreateUserRequest   │
+       ├──────────────────────┤
+       │ - username           │
+       │ - email              │
+       │ - password           │
+       └──────────────────────┘
+
+       ┌──────────────────────┐
+       │  UserDTO             │
+       ├──────────────────────┤
+       │ - id                 │
+       │ - username           │
+       │ - email              │
+       └──────────────────────┘
+
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │ PHASE 7: CONTROLLERS (REST Endpoints)                                       │
+ └─────────────────────────────────────────────────────────────────────────────┘
+
+   11. Create AuthController
+
+       ┌─────────────────────────────────────────────────────────────┐
+       │  POST /api/auth/login                                       │
+       ├─────────────────────────────────────────────────────────────┤
+       │                                                             │
+       │  Request:  { "username": "john", "password": "pass123" }   │
+       │                                                             │
+       │  Flow:                                                      │
+       │  1. authenticationManager.authenticate()                   │
+       │     ├─ Load user from database                             │
+       │     ├─ Get hashed password from DB                         │
+       │     ├─ Hash input password                                 │
+       │     └─ Compare hashes → Match?  YES!                         │
+       │                                                             │
+       │  2. jwtService.generateToken(userDetails)                  │
+       │     └─ Create JWT with username + roles                    │
+       │                                                             │
+       │  3. Return response:                                         │
+       │     {                                                       │
+       │       "token": "eyJhbGc.. .",                                │
+       │       "type": "Bearer",                                     │
+       │       "expiresIn": 3600                                     │
+       │     }                                                       │
+       │                                                             │
+       └─────────────────────────────────────────────────────────────┘
+
+   12. Create UserController
+
+       ┌─────────────────────────────────────────────────────────────┐
+       │  POST /api/users (Signup)                                   │
+       ├─────────────────────────────────────────────────────────────┤
+       │                                                             │
+       │  Request:  {                                                 │
+       │    "username": "john",                                      │
+       │    "email":  "john@example.com",                             │
+       │    "password":  "pass123"                                    │
+       │  }                                                          │
+       │                                                             │
+       │  Flow:                                                       │
+       │  1. Validate input (no blanks, valid email)                │
+       │  2. Check if username exists                               │
+       │  3. Check if email exists                                  │
+       │  4. Hash password                                          │
+       │  5. Save to MongoDB                                        │
+       │  6. Return UserDTO (NO password!)                          │
+       │                                                             │
+       └─────────────────────────────────────────────────────────────┘
+
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │ PHASE 8: EXCEPTION HANDLING (Global error responses)                        │
+ └─────────────────────────────────────────────────────────────────────────────┘
+
+   13. Create GlobalExceptionHandler
+
+       Catches all exceptions and returns proper HTTP responses:
+
+       ├─ BadCredentialsException → 401 Unauthorized
+       ├─ UserAlreadyExistsException → 400 Bad Request
+       ├─ ConstraintViolationException → 400 Bad Request
+       ├─ AccessDeniedException → 403 Forbidden
+       └─ Exception → 500 Internal Server Error
+
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │ PHASE 9: TEST THE FLOW (End to End)                                         │
+ └─────────────────────────────────────────────────────────────────────────────┘
+
+   ┌─────────────────────────────────────────────────────────────────┐
+   │                    COMPLETE LOGIN FLOW                          │
+   └─────────────────────────────────────────────────────────────────┘
+
+   CLIENT                                    SERVER
+
+   1. POST /api/users (Signup)
+      ├─ Send:  username, email, password
+      └─────────────────────────────────────→ UserController
+                                             ├─ Validate input
+                                             ├─ Hash password
+                                             ├─ Save to MongoDB
+                                             └─ Return UserDTO
+      ←─────────────────────────────────────
+      Response: { id, username, email }
+
+   2. POST /api/auth/login
+      ├─ Send: username, password
+      └─────────────────────────────────────→ AuthController
+                                             ├─ AuthenticationManager
+                                             │  ├─ Load user
+                                             │  ├─ Compare passwords
+                                             │  └─ Success!
+                                             ├─ JwtService. generateToken()
+                                             └─ Return token
+      ←─────────────────────────────────────
+      Response: {
+        "token": "eyJhbGc...",
+        "type":  "Bearer",
+        "expiresIn": 3600
+      }
+
+   3. Store token in localStorage/sessionStorage on client
+
+   4. Future requests with token:
+      GET /api/tasks
+      Headers: Authorization: Bearer eyJhbGc...
+      │
+      └─────────────────────────────────────→ JwtAuthenticationFilter
+                                             ├─ Extract token
+                                             ├─ Validate signature
+                                             ├─ Check expiration
+                                             ├─ Load UserDetails
+                                             ├─ Set SecurityContext
+                                             └─ Continue to controller
+      ←─────────────────────────────────────
+      Response: [tasks for authenticated user]
+
+
+ ╔════════════════════��═════════════════════════════════════════════════════════╗
+ ║                      SECURITY LAYERS VISUALIZATION                           ║
+ ╚══════════════════════════════════════════════════════════════════════════════╝
+
+                     ┌─────────────────────────────┐
+                     │     Client (Browser)        │
+                     │  localStorage:  JWT token    │
+                     └──────────────┬──────────────┘
+                                    │
+                     ┌──────────────┴──────────────┐
+                     │  HTTP Request              │
+                     │  Authorization: Bearer ...  │
+                     └──────────────┬──────────────┘
+                                    │
+         ┌──────────────────────────▼───────────────────────────┐
+         │         Spring Security Chain                        │
+         ├──────────────────────────────────────────────────────┤
+         │                                                      │
+         │  1️⃣  JwtAuthenticationFilter (Custom)               │
+         │      └─ Extract & validate JWT token                │
+         │         └─ Set SecurityContext                      │
+         │                                                      │
+         │  2️⃣  SecurityFilterChain                             │
+         │      └─ Check authorization rules                   │
+         │         ├─ /api/auth/** → permitAll                │
+         │         ├─ /api/users/** → permitAll               │
+         │         └─ /** → requires authentication            │
+         │                                                      │
+         │  3️⃣  @PreAuthorize (Method level)                   │
+         │      └─ hasRole('ADMIN')                            │
+         │      └─ hasAnyRole('USER', 'ADMIN')                │
+         │                                                      │
+         └──────────────────────────┬───────────────────────────┘
+                                    │
+                     ┌──────────────▼──────────────┐
+                     │    Controller Endpoint      │
+                     │  (Only if authorized)       │
+                     └──────────────┬──────────────┘
+                                    │
+                     ┌──────────────▼──────────────┐
+                     │    Service Layer           │
+                     │  (Business Logic)          │
+                     └──────────────┬──────────────┘
+                                    │
+                     ┌──────────────▼──────────────┐
+                     │    Repository              │
+                     │  (Database Queries)        │
+                     └──────────────┬──────────────┘
+                                    │
+                     ┌──────────────▼──────────────┐
+                     │    MongoDB                 │
+                     │  (Persistent Storage)      │
+                     └────────────────────────────┘
+
+
+ ╔══════════════════════════════════════════════════════════════════════════════╗
+ ║                      YOUR TASK-API IMPLEMENTATION                            ║
+ ╚══════════════════════════════════════════════════════════════════════════════╝
+
+ ✅ COMPLETED:
+   ├─ User model + UserRepository
+   ├─ PasswordEncoder (BCrypt)
+   ├─ UserService (createUser, getUser)
+   ├─ JwtService (generateToken, validateToken)
+   ├─ JwtAuthenticationFilter (extract & validate JWT)
+   ├─ SecurityConfig (filter chain + auth rules)
+   ├─ AuthController (POST /api/auth/login)
+   ├─ UserController (POST /api/users signup)
+   └─ DTOs (LoginRequest, LoginResponse, CreateUserRequest)
+
+ ❌ TODO (NEXT):
+   ├─ Task model ✓ (already have)
+   ├─ TaskRepository + methods ✓ (need updates)
+   ├─ TaskService (create, read, update, delete)
+   │  └─ WITH OWNERSHIP CHECKS!
+   ├─ TaskController (4 CRUD endpoints)
+   │  └─ Extract userId from JWT
+   ├─ Task DTOs ✓ (mostly have)
+   └─ Exception classes ✓ (need to create)
 */
