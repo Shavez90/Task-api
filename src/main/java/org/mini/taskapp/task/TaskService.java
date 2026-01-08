@@ -19,8 +19,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class TaskService {
-  private TaskRepository taskRepository;
-  private UserRepository userRepository;
+  private final TaskRepository taskRepository;
+  private  final UserRepository userRepository;
 /// /create
    public TaskResponseDTO createTask(String username, CreateTaskRequest request){
        User user = userRepository.findByUsername(username)
@@ -42,7 +42,7 @@ public class TaskService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
 
-        return taskRepository.findAllByUserId(user.getId())
+        return taskRepository.findByUserId(user.getId())
                 .stream()
                 .map(this::mapToDto)
                 .toList();

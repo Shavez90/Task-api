@@ -77,7 +77,7 @@ public class TaskController {
     public List<TaskResponseDTO> getUserJournals() {
 
         User currentUser = getAuthenticatedUser();
-        return taskService.getMyTask(currentUser.getId());
+        return taskService.getMyTask(currentUser.getUsername());
     }
 
     @GetMapping("/{journalId}")
