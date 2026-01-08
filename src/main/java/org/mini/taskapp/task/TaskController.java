@@ -74,14 +74,14 @@ public class TaskController {
     // ================= READ =================
 
     @GetMapping
-    public List<TaskResponseDTO> getUserJournals() {
+    public List<TaskResponseDTO> getUserTask() {
 
         User currentUser = getAuthenticatedUser();
         return taskService.getMyTask(currentUser.getUsername());
     }
 
     @GetMapping("/{journalId}")
-    public TaskResponseDTO getJournal(@PathVariable String journalId) {
+    public TaskResponseDTO getTask(@PathVariable String journalId) {
         User currentUser = getAuthenticatedUser();
         return taskService.getTaskById(journalId, currentUser. getId());
     }
