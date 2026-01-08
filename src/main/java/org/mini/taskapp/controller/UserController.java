@@ -24,7 +24,6 @@ public class UserController {
     // ================= GET CURRENT USER (JWT) =================
     // For logged-in USER or ADMIN to fetch own profile
 
-    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     @GetMapping("/me")
     public UserDTO getCurrentUser(Authentication authentication) {
         return userService.getUserByUsername(authentication.getName());

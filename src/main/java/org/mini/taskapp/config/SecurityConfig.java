@@ -29,7 +29,11 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/users/**").permitAll()
+                        .requestMatchers("/api/users").permitAll()  // ✅ Only POST /api/users (signup)
+                        .requestMatchers("/api/users/me").authenticated()
+                        .requestMatchers("/api/task/**").authenticated()  // ✅ ADD THIS
+
+                        // ✅ Need JWT for /me
                         .anyRequest().authenticated())
                 .addFilterBefore(
                         jwtAuthenticationFilter,
